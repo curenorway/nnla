@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+
+<body>
+    <script>
+        $(document).ready(function () {
+            function checkMemberstack() {
+                if (window.memberstack) {
+                    // Memberstack is loaded, do something here
+                    console.log("Memberstack is loaded");
+                    var items = $(".course_chapter-item");
+                    var itemsLength = items.length;
+                    var promises = [];
+
+                    function processItem(item) {
+                        return new Promise(resolve => {
+                            // Your code here
+                            console.log("Processing item: " + item.text());
+                            resolve();
+                        });
+                    }
+
+                    items.each(function () {
+                        promises.push(processItem($(this)));
+                    });
+
+                    Promise.all(promises).then(function () {
+                        setTimeout(function () {
+                            console.log("All items have been processed");
+                            // Your code here
+
+                            // LESSONS HERE
+
+                            // globals
+                            var user;
+                            var metadata;
+                            var completedUrls;
+                            var currentUrl = window.location.href;
+                            var completedLink = document.getElementById('statusCompleted');
+                            var notCompletedLink = document.getElementById('statusNotCompleted');
+                            var loadingSpinner = document.getElementById('loading');
+
+                            // toggle display
+                            function displayNotCompletedLink() {
+                                loadingSpinner.style.display = 'none';
+                                notCompletedLink.style.display = 'block';
+                                completedLink.style.display = 'none';
+                            }
+
+                            // toggle display
+                            function displayCompletedLink() {
+                                loadingSpinner.style.display = 'none';
+                                completedLink.style.display = 'block';
+                                notCompletedLink.style.display = 'none';
+                            }
+
+                            // toggle display
+                            function displayLoadingSpinner() {
+                                loadingSpinner.style.display = 'block';
+                                completedLink.style.display = 'none';
+                                notCompletedLink.style.display = 'none';
+                            }
+
+                            // update completed status in remote datastore
+                            async function updateMetaData(urls, redirectTo) {
+                                displayLoadingSpinner();
+                                await user.updateMetaData({
+                                    completed: urls
+                                });
+                                window.location = redirectTo;
+                            }
+
+                            // remove the current url
+                            completedLink.addEventListener('click', function (event) {
+                                event.preventDefault();
+
+                                let currentIndex = completedUrls.indexOf(currentUrl);
+                                if (currentIndex > -1) {
+                                    let filteredUrls = completedUrls.filter(url => url != currentUrl);
+                                    updateMetaData(filteredUrls, notCompletedLink.href);
+                                }
+                            });
+
+                            // add the current url
+                            notCompletedLink.addEventListener('click', function (event) {
+                                event.preventDefault();
+
+                                completedUrls.push(currentUrl);
+                                updateMetaData(completedUrls, completedLink.href);
+                            });
+
+                            // display correct completed link
+                            MemberStack.onReady.then(async function (member) {
+
+                                // get members metadata
+                                metadata = await member.getMetaData()
+
+                                // assign to outside scope
+                                user = member;
+
+                                // get metadata key we're interested in
+                                completedUrls = metadata.completed ? metadata.completed : [];
+
+                                // loop all urls found in the JSON stored within MemberStack
+                                for (let c = 0; c <= completedUrls.length; c++) {
+
+                                    // set the current url stored in MemberStack
+                                    let completedUrl = completedUrls[c];
+
+                                    // if the current url and stored url match
+                                    if (currentUrl === completedUrl) {
+
+                                        // toggle display
+                                        displayCompletedLink();
+
+                                        // break out of this for loop
+                                        c = completedUrls.length;
+
+                                    } else {
+
+                                        // toggle display
+                                        displayNotCompletedLink();
+
+                                    }
+                                }
+
+                                // COURSES HERE
+
+                                // setup
+                                var loadingClass = 'course_loading-icon'
+                                var completedClass = 'course_completed-icon';
+                                var notCompletedClass = 'course_play-icon';
+                                var lessonItemClass = '.course_lessons-item';
+                                var lessonsId = 'lessons';
+
+                                // set default state
+                                var completedState = notCompletedClass;
+
+
+                                // fetch remote metadata
+                                var completedLessons = metadata.completed ? metadata.completed : [];
+
+                                // Get custom fields if member is logged in.
+                                if (member.loggedIn) {
+                                    // Get the name
+                                    var nameValue = member["name"];
+                                    document.getElementById("usersName").innerHTML = nameValue;
+                                    document.getElementById("memberLetter").innerHTML = nameValue[0];
+
+                                }
+
+                                // Initialize counts for each possible URL path
+                                var courseCount = 0;
+                                var totalCount = 0;
+
+                                // get all of the lesson links listed (from CMS Collection)
+                                var links = document.getElementById(lessonsId).getElementsByTagName('a');
+
+                                // loop all of the links
+                                for (let l = 0; l < links.length; l++) {
+
+                                    // setup the current link variables
+                                    var link = links[l];
+                                    var linkUrl = link.href;
+
+                                    // loop all links found in the JSON stored in MemberStack
+                                    for (let c = 0; c < completedLessons.length; c++) {
+
+                                        // set the current url stored in MemberStack
+                                        var completedUrl = completedLessons[c];
+
+                                        // if the current link and stored link match
+                                        if (linkUrl === completedUrl) {
+
+                                            // increment total count
+                                            totalCount++;
+
+                                            // increment count for corresponding path
+                                            if (linkUrl.startsWith('https://www.nordicneurolab.com/lesson/')) {
+                                                courseCount++;
+                                            }
+
+                                            // set completed state
+                                            completedState = completedClass;
+
+                                            // break out of this for loop and
+                                            // check the next link
+                                            c = completedLessons.length;
+
+                                        } else {
+
+                                            // set completed state
+                                            completedState = notCompletedClass;
+
+                                        }
+                                    }
+
+                                    // display completed state to screen
+                                    let lessonItem = link.closest(lessonItemClass);
+                                    (completedState === completedClass) ? displayCompleted(lessonItem) : displayNotCompleted(lessonItem);
+                                }
+
+
+                                // CHECK AND DISPLAY IF COURSES ARE COMPLETE
+                                //
+                                // Compare counted completed lessons to total lessons in the courses.
+
+                                // Get total lessons in courses
+                                var courseElem = document.getElementById("courseElem");
+
+                                // If lessona are completed, do this.
+
+                                if (courseCount === courseElem.innerHTML) {
+                                    console.log("Path 4 count matches element value");
+                                } else {
+                                    console.log("Path 4 count does not match element value");
+                                }
+
+                                // END OF BLOCK
+
+
+
+                                // CALCULATE THE COMPLETION CIRCLE
+                                // 
+                                // 
+                                // Compare total count to total of element values
+
+                                var totalElem = courseCount;
+                                var totalElemValue = parseInt(courseElem.innerHTML)
+
+                                if (totalCount === totalElemValue) {
+                                    console.log("Total count matches total of element values");
+                                } else {
+                                    console.log("Total count does not match total of element values");
+                                }
+
+
+
+                                // DISPLAY COMPLETION STATE OF COURSES
+                                //
+                                // show the completed state
+                                function displayCompleted(lessonItem) {
+                                    lessonItem.getElementsByClassName(loadingClass)[0].style.display = 'none';
+                                    lessonItem.getElementsByClassName(completedClass)[0].style.display = 'block';
+                                    lessonItem.getElementsByClassName(notCompletedClass)[0].style.display = 'none';
+                                }
+
+                                // show the not completed state
+                                function displayNotCompleted(lessonItem) {
+                                    lessonItem.getElementsByClassName(loadingClass)[0].style.display = 'none';
+                                    lessonItem.getElementsByClassName(notCompletedClass)[0].style.display = 'block';
+                                    lessonItem.getElementsByClassName(completedClass)[0].style.display = 'none';
+                                }
+
+
+                                // Progress bar
+
+                                var totalLessons = Number(courseElem.innerHTML);
+                                var completedLessons = courseCount;
+                                var progress = completedLessons / totalLessons;
+
+                                console.log(progress);
+
+                                var bar = new ProgressBar.Circle('#progress-bar-container', {
+                                    color: '#aaa',
+                                    strokeWidth: 8,
+                                    trailWidth: 4,
+                                    svgStyle: {
+                                        strokeLinecap: 'round'
+                                    },
+                                    easing: 'easeInOut',
+                                    duration: 1400,
+                                    text: {
+                                        autoStyleContainer: false
+                                    },
+                                    from: { color: '#437ef6', width: 8 },
+                                    to: { color: '#437ef6', width: 8 },
+                                    // Set default step function for all animate calls
+                                    step: function (state, circle) {
+                                        circle.path.setAttribute('stroke', state.color);
+                                        circle.path.setAttribute('stroke-width', state.width);
+
+                                        var value = Math.round(circle.value() * 100);
+                                        if (value === 0) {
+                                            circle.setText('');
+                                        } else {
+                                            circle.setText(value + '%');
+                                        }
+                                    }
+                                });
+
+                                bar.animate(progress);
+
+
+
+                                // Get the container div with ID "lessons"
+                                var container = document.getElementById("lessons");
+
+                                // Get all links within the container div
+                                var links = container.querySelectorAll("a");
+
+                                // Get the current URL
+                                var currentURL = window.location.href;
+
+                                // Find the active link (the link with the same href as the current URL)
+                                var activeLink = null;
+                                for (var i = 0; i < links.length; i++) {
+                                    if (links[i].href === currentURL) {
+                                        activeLink = links[i];
+                                        break;
+                                    }
+                                }
+
+                                // If an active link was found
+                                if (activeLink) {
+                                    // Calculate the distance from the top of the container div to the top of the active link
+                                    var linkTop = activeLink.offsetTop - container.offsetTop;
+
+                                    // Add an offset of 20px
+                                    var offset = 20;
+
+                                    // Scroll the container so that the active link is at the top of the viewport with a 20px offset
+                                    container.scrollTop = linkTop - offset;
+                                }
+
+
+                                var strippedUrl = currentUrl.replace("https://www.nordicneurolab.com", "");
+
+                                // Add current class to current link element
+                                $(".course_lessons-item").each(function () {
+                                    var lessonLink = $(this).find("a").attr("href");
+                                    console.log("lessonLink is " + lessonLink);
+                                    console.log("currentUrl is " + strippedUrl);
+                                    if (lessonLink === strippedUrl) {
+                                        $(this).addClass("active");
+                                        console.log("Success!!!");
+                                        scrollElementToTop('.active');
+                                    }
+                                });
+
+                                function scrollElementToTop(elementClass) {
+                                    const element = document.querySelector('.active');
+                                    const parent = document.querySelector('#lessons');
+                                    parent.scrollTop = element.offsetTop - 60;
+                                    console.log('Scroll check runned!');
+                                }
+
+
+                                // HANDLE THE COMPLETE / NEXT BUTTON
+
+                                const nextCompletedLink = document.querySelector("#statusCompleted");
+
+                                nextCompletedLink.addEventListener("click", function () {
+                                    setTimeout(function () {
+                                        window.location.reload();
+                                    }, 100);
+                                });
+
+                                const nextContainer = document.querySelector("#lessons");
+                                const nextLinks = Array.from(nextContainer.getElementsByTagName("a"));
+                                let nextActiveLink;
+
+                                for (let i = 0; i < nextLinks.length; i++) {
+                                    const parent = nextLinks[i].closest(".active");
+                                    if (parent) {
+                                        nextActiveLink = nextLinks[i];
+                                        break;
+                                    }
+                                }
+
+                                const button = notCompletedLink;
+                                const fallbackLink = document.querySelector("#courseLink");
+                                const fallbackURL = fallbackLink.getAttribute("data-url");
+
+                                const indexOfActiveLink = nextLinks.indexOf(nextActiveLink);
+                                const nextLink = nextLinks[indexOfActiveLink + 1];
+
+                                if (nextLink) {
+                                    button.addEventListener("click", function () {
+                                        setTimeout(function () {
+                                            window.location.href = nextLink.href;
+                                        }, 100);
+                                    });
+                                } else {
+                                    button.addEventListener("click", function () {
+                                        setTimeout(function () {
+                                            window.location.href = fallbackURL;
+                                        }, 100);
+                                    });
+                                }
+
+                            }, 100);
+
+                        });
+
+                    });
+                } else {
+                    // Memberstack is not loaded yet, try again later
+                    console.log("Memberstack is not loaded yet");
+                    setTimeout(checkMemberstack, 50);
+                }
+            }
+            checkMemberstack();
+        });
+
+    </script>
+</body>
+
+</html>
