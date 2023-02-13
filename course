@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <script>
+
+        $(document).ready(function () {
+            function checkMemberstack() {
+                if (window.memberstack) {
+                    // Memberstack is loaded, do something here
+                    console.log("Memberstack is loaded");
+                    var items = $(".course_chapter-item");
+                    var itemsLength = items.length;
+                    var promises = [];
+
+                    function processItem(item) {
+                        return new Promise(resolve => {
+                            // Your code here
+                            console.log("Processing item: " + item.text());
+                            resolve();
+                        });
+                    }
+
+                    items.each(function () {
+                        promises.push(processItem($(this)));
+                    });
+
+                    Promise.all(promises).then(function () {
+                        console.log("All items have been processed");
+
+                        runCode();
+
+                    });
+                }
+                function runCode() {
+                    // Your code here
+                    MemberStack.onReady.then(async function (member) {
+
+                        // setup
+                        var loadingClass = 'course_loading-icon'
+                        var completedClass = 'course_completed-icon';
+                        var notCompletedClass = 'course_play-icon';
+                        var lessonItemClass = '.course_lessons-item';
+                        var lessonsId = 'lessons';
+
+                        // set default state
+                        var completedState = notCompletedClass;
+
+
+                        // fetch remote metadata
+                        let metadata = await member.getMetaData()
+                        var completedLessons = metadata.completed ? metadata.completed : [];
+
+                        // Get custom fields if member is logged in.
+                        if (member.loggedIn) {
+                            // Get the name
+                            var nameValue = member["name"];
+                            document.getElementById("usersName").innerHTML = nameValue;
+                            document.getElementById("memberLetter").innerHTML = nameValue[0];
+
+                        }
+
+
+
+
+                        // Initialize counts for each possible URL path
+                        var courseCount = 0;
+                        var totalCount = 0;
+
+                        // get all of the lesson links listed (from CMS Collection)
+                        var links = document.getElementById(lessonsId).getElementsByTagName('a');
+                        console.log('The links are these ' + links);
+
+                        // loop all of the links
+                        for (let l = 0; l < links.length; l++) {
+
+                            // setup the current link variables
+                            var link = links[l];
+                            var linkUrl = link.href;
+
+                            // loop all links found in the JSON stored in MemberStack
+                            for (let c = 0; c < completedLessons.length; c++) {
+
+                                // set the current url stored in MemberStack
+                                var completedUrl = completedLessons[c];
+
+                                // if the current link and stored link match
+                                if (linkUrl === completedUrl) {
+
+                                    // increment total count
+                                    totalCount++;
+                                    console.log('Total count is ' + totalCount);
+
+                                    // increment count for corresponding path
+                                    if (linkUrl.startsWith('https://www.nordicneurolab.com/lesson/')) {
+                                        courseCount++;
+                                        console.log('Course count is ' + courseCount);
+                                    }
+
+                                    // set completed state
+                                    completedState = completedClass;
+
+                                    // break out of this for loop and
+                                    // check the next link
+                                    c = completedLessons.length;
+
+                                } else {
+
+                                    // set completed state
+                                    completedState = notCompletedClass;
+
+                                }
+                            }
+
+                            // display completed state to screen
+                            let lessonItem = link.closest(lessonItemClass);
+                            (completedState === completedClass) ? displayCompleted(lessonItem) : displayNotCompleted(lessonItem);
+                        }
+
+
+                        // DISPLAY TEXT IN BUTTON
+                        const courseButton = document.querySelector('#courseButton');
+
+                        console.log("Completed lenght is " + completedLessons.length);
+                        if (completedLessons.length === 0) {
+                            courseButton.innerText = 'Begin course';
+                        } else {
+                            courseButton.innerText = 'Continue course';
+                        }
+
+
+
+                        // CHECK AND DISPLAY IF COURSES ARE COMPLETE
+                        //
+                        // Compare counted completed lessons to total lessons in the courses.
+
+                        // Get total lessons in courses
+                        var courseElem = document.getElementById("courseElem");
+
+                        // If lessons are completed, do this.
+
+                        if (courseCount === courseElem.innerHTML) {
+                            console.log("The course is complete!");
+                        } else {
+                            console.log("The course is incomplete.");
+                        }
+
+                        // Check if there are completed lessons
+                        if (courseCount === 0) {
+                            // Change the text of the button
+                            document.getElementById("courseButton").innerHTML = "Begin course";
+
+                            // Link to the first uncomplete lesson
+                            var firstUncompleteLesson = document.getElementById(lessonsId).getElementsByTagName('a')[0].href;
+                            document.getElementById("courseButton").href = firstUncompleteLesson;
+                        }
+
+                        // END OF BLOCK
+
+
+
+                        // CALCULATE THE COMPLETION CIRCLE
+                        // 
+                        // 
+                        // Compare total count to total of element values
+
+                        var totalElem = courseCount;
+                        var totalElemValue = parseInt(courseElem.innerHTML)
+
+                        if (totalCount === totalElemValue) {
+                            console.log("Total count matches total of element values");
+                            document.getElementById("courseButton").style.display = "none";
+                            document.getElementById("courseComplete").style.display = "block";
+                        } else {
+                            console.log("Total count does not match total of element values");
+                        }
+
+
+                        // set width percentage of corresponding elements
+                        var courseBar = document.getElementById("courseBar");
+                        var courseTotal = parseInt(courseElem.innerHTML);
+                        var coursePercentElem = document.getElementById("coursePercentage");
+
+                        if (courseTotal > 0) {
+                            var coursePercent = (courseCount / courseTotal) * 100;
+                            var coursePercentRound = Math.round(coursePercent);
+                            coursePercentElem.innerHTML = coursePercentRound;
+                            courseBar.style.width = coursePercent + '%';
+                        }
+
+                        // END OF BLOCK
+
+
+
+                        // DISPLAY COMPLETION STATE OF COURSES
+                        //
+                        // show the completed state
+                        function displayCompleted(lessonItem) {
+                            lessonItem.getElementsByClassName(loadingClass)[0].style.display = 'none';
+                            lessonItem.getElementsByClassName(completedClass)[0].style.display = 'block';
+                            lessonItem.getElementsByClassName(notCompletedClass)[0].style.display = 'none';
+                        }
+
+                        // show the not completed state
+                        function displayNotCompleted(lessonItem) {
+                            lessonItem.getElementsByClassName(loadingClass)[0].style.display = 'none';
+                            lessonItem.getElementsByClassName(notCompletedClass)[0].style.display = 'block';
+                            lessonItem.getElementsByClassName(completedClass)[0].style.display = 'none';
+                        }
+
+                        // show how many are completed
+                        var courseCountDisplay = document.getElementById('courseCount');
+                        courseCountDisplay.innerHTML = courseCount;
+
+
+                        // Button controller
+
+                        var firstUncompletedLink;
+                        for (var i = 0; i < links.length; i++) {
+                            if (!completedLessons.includes(links[i].href)) {
+                                firstUncompletedLink = links[i].href;
+                                break;
+                            }
+                        }
+
+                        var button = document.getElementById("courseButton");
+                        if (firstUncompletedLink) {
+                            button.href = firstUncompletedLink;
+                            //button.innerHTML = "Continue course";
+                        } else {
+                            button.href = links[0].href;
+                            //button.innerHTML = "Begin course";
+                        }
+
+
+
+                        // Progress bar
+
+                        var totalLessons = Number(courseElem.innerHTML);
+                        var completedLessons = courseCount;
+                        var progress = completedLessons / totalLessons;
+
+                        console.log(progress);
+
+                        var bar = new ProgressBar.Circle('#progress-bar-container', {
+                            color: '#aaa',
+                            strokeWidth: 8,
+                            trailWidth: 4,
+                            svgStyle: {
+                                strokeLinecap: 'round'
+                            },
+                            easing: 'easeInOut',
+                            duration: 1400,
+                            text: {
+                                autoStyleContainer: false
+                            },
+                            from: { color: '#437ef6', width: 8 },
+                            to: { color: '#437ef6', width: 8 },
+                            // Set default step function for all animate calls
+                            step: function (state, circle) {
+                                circle.path.setAttribute('stroke', state.color);
+                                circle.path.setAttribute('stroke-width', state.width);
+
+                                var value = Math.round(circle.value() * 100);
+                                if (value === 0) {
+                                    circle.setText('');
+                                } else {
+                                    circle.setText(value + '%');
+                                }
+                            }
+                        });
+
+                        bar.animate(progress);
+
+                    });
+                }
+            }
+
+            checkMemberstack();
+
+        });
+
+
+    </script>
+</body>
+
+</html>
